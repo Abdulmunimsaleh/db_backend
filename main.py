@@ -11,7 +11,7 @@ CORS(app)
 db_config = {
     'host': '127.0.0.1',
     'user': 'root',
-    'password': 'your_password',  # Replace with your MySQL password
+    'password': '',  # Replace with your MySQL password
     'database': 'payments_db'
 }
 
