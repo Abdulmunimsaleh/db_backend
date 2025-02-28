@@ -1,5 +1,3 @@
 Flask 
 mysql-connector-python
-fastapi
-pydantic
-uvicorn
+flask-cors
