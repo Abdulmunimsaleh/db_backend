@@ -1,52 +1,65 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from flask import Flask, request, jsonify
 import mysql.connector
-from mysql.connector import Error
+from flask_cors import CORS  # Import CORS
 
-# Initialize FastAPI app
-app = FastAPI()
+app = Flask(__name__)
 
-# Database connection details
+# Enable CORS for all routes
+CORS(app)
+
+# Database connection configuration
 db_config = {
-    "host": "127.0.0.1",  # Replace with your database host
-    "user": "root",        # Replace with your database username
-    "password": "",        # Replace with your database password
-    "database": "payments_db"  # Replace with your database name
+    'host': '127.0.0.1',
+    'user': 'root',
+    'password': 'your_password',  # Replace with your MySQL password
+    'database': 'payments_db'
 }
 
-# Pydantic model for request body
-class PaymentRequest(BaseModel):
-    user_id: str
-
-@app.post("/mark_payment_as_completed")
-async def mark_payment_as_completed(payment_request: PaymentRequest):
+# Route to update payment status in the database
+@app.route('/update_payment/<user_id>', methods=['GET'])
+def update_payment(user_id):
     try:
-        # Connect to the database
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
 
-        # Extract user_id from the request
-        user_id = payment_request.user_id
-
-        # Update the payment status in the database
-        sql = "UPDATE payments SET status = 'completed' WHERE user_id = %s AND status = 'pending'"
-        cursor.execute(sql, (user_id,))
+        # Update the payment status to 'completed'
+        query = "UPDATE payments SET status = 'completed' WHERE user_id = %s"
+        cursor.execute(query, (user_id,))
         conn.commit()
 
-        # Check if any rows were updated
         if cursor.rowcount > 0:
-            return {"success": True, "message": "Payment status updated successfully"}
+            return jsonify({"status": "success", "message": "Payment updated successfully."})
         else:
-            raise HTTPException(status_code=404, detail="No pending payment found for the given user_id")
-
-    except Error as err:
-        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+            return jsonify({"status": "error", "message": "User ID not found."}), 404
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating payment status: {e}")
-
+        return jsonify({"status": "error", "message": str(e)}), 500
     finally:
-        # Close the database connection
-        if 'conn' in locals() and conn.is_connected():
-            cursor.close()
-            conn.close()
+        cursor.close()
+        conn.close()
+
+# Route to check payment status
+@app.route('/check_payment/<user_id>', methods=['GET'])
+def check_payment(user_id):
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+
+        # Check the payment status
+        query = "SELECT status FROM payments WHERE user_id = %s"
+        cursor.execute(query, (user_id,))
+        result = cursor.fetchone()
+
+        if result:
+            return jsonify({"status": result[0]})
+        else:
+            return jsonify({"status": "error", "message": "User ID not found."}), 404
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+if __name__ == '__main__':
+    app.run(debug=True)
